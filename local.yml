@@ -65,7 +65,7 @@
       script: files/make_chroot /var/lib/domjudge/javachroot/ creates=/var/lib/domjudge/javachroot/
       tags: domjudge-judgehost
       environment:
-        DEBMIRROR: http://us-east-1.ec2.archive.ubuntu.com.s3.amazonaws.com/ubuntu
+        DEBMIRROR: http://us-east-1.ec2.archive.ubuntu.com/ubuntu
 
     - name: debconf accept java license
       debconf: name='oracle-java8-installer' question='shared/accepted-oracle-license-v1-1' value='true' vtype='select'
