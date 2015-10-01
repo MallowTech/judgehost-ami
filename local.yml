@@ -54,7 +54,7 @@
       tags: domjudge-judgehost
 
     - name: enable swap accounting(for cgroups)
-      lineinfile: dest=/etc/default/grub regexp="^GRUB_CMDLINE_LINUX=" line='GRUB_CMDLINE_LINUX="consoleblank=0 swapaccount=1"' state=present
+      lineinfile: dest=/etc/default/grub regexp="^GRUB_CMDLINE_LINUX_DEFAULT=" line='GRUB_CMDLINE_LINUX_DEFAULT="console=tty1 console=ttyS0 consoleblank=0 swapaccount=1"' state=present
       notify: update grub
 
     - name: install debootstrap which is used when making the chroot
