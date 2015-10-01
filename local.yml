@@ -1,0 +1,109 @@
+---
+- hosts: localhost
+  user: root
+  pre_tasks:
+    - name: disable fsync for dpkg
+      copy: src=files/02-dpkg-no-sync dest=/etc/dpkg/dpkg.cfg.d/02-dpkg-no-sync
+    - name: disable apt cache
+      copy: src=files/02-fast-apt dest=/etc/apt/apt.conf.d/02-fast-apt
+    - name: be sure apt cache is updated
+      apt: update_cache=yes
+
+  vars:
+    domjudge_api_endpoint: http://some-endpoint.example.com/api
+    domjudge_api_endpoint_user: judgehost
+    domjudge_api_endpoint_pass: judgehost_pass
+    domjudge_repo: 'deb http://domjudge.org/debian unstable/'
+    domjudge_repo_key: 'http://domjudge.org/repokey.asc'
+
+  tasks:
+    # pre-reqs for apt_repository
+    - name: install pre-requisites
+      apt: pkg={{ item }} state=present
+      with_items:
+        - python-pycurl
+        - python-apt
+      tags: domjudge-judgehost
+
+    - name: debconf seed judgehost setup
+      debconf: name='{{ item['name'] }}' question='{{ item['question'] }}' value='{{ item.value }}' vtype='{{ item.type }}'
+      tags: domjudge-judgehost
+      with_items:
+          - name: domjudge-judgehost
+            question: 'domjudge/api_endpoint'
+            value: "{{ domjudge_api_endpoint }}"
+            type: password
+          - name: domjudge-judgehost
+            question: 'domjudge/api_endpoint_user'
+            value: "{{ domjudge_api_endpoint_user }}"
+            type: string
+          - name: domjudge-judgehost
+            question: 'domjudge/api_endpoint_pass'
+            value: "{{ domjudge_api_endpoint_pass }}"
+            type: string
+
+    - name: add signing key for the domjudge packages
+      apt_key: url={{ domjudge_repo_key }} state=present
+
+    - name: add the official domjudge repository
+      apt_repository: repo="{{ domjudge_repo }}" update_cache=yes state=present
+      tags: domjudge-judgehost
+
+    - name: install the domjudge judgehost
+      apt: pkg=domjudge-judgehost state=latest install_recommends=no
+      tags: domjudge-judgehost
+
+    - name: enable swap accounting(for cgroups)
+      lineinfile: dest=/etc/default/grub regexp="^GRUB_CMDLINE_LINUX=" line='GRUB_CMDLINE_LINUX="consoleblank=0 swapaccount=1"' state=present
+      notify: update grub
+
+    - name: install debootstrap which is used when making the chroot
+      apt: pkg=debootstrap state=latest
+      tags: domjudge-judgehost
+
+    - name: setup the chroot
+      script: files/make_chroot /var/lib/domjudge/javachroot/ creates=/var/lib/domjudge/javachroot/
+      tags: domjudge-judgehost
+      environment:
+        DEBMIRROR: http://us-east-1.ec2.archive.ubuntu.com.s3.amazonaws.com/ubuntu
+
+    - name: debconf accept java license
+      debconf: name='oracle-java8-installer' question='shared/accepted-oracle-license-v1-1' value='true' vtype='select'
+      tags: java
+
+    - name: be sure webupd8team ppa is available
+      apt_repository: repo='ppa:webupd8team/java' update_cache=yes state=present
+      tags: java
+
+    - name: install compilers
+      apt: pkg={{ item }} state=present
+      with_items:
+          - oracle-java8-installer
+          - build-essential
+          - gfortran
+          - gnat
+          - mono-mcs
+          - fpc
+          - ghc
+          - lua5.2
+          - ruby
+          - python
+          - python3
+
+    - name: check for scala
+      stat: path=/usr/bin/scala
+      register: has_scala
+    - name: get scala deb file
+      get_url: url=http://downloads.typesafe.com/scala/2.11.7/scala-2.11.7.deb dest=/tmp/scala.deb
+      when: not has_scala.stat.exists
+    - name: install scala
+      apt: deb=/tmp/scala.deb
+      when: not has_scala.stat.exists
+
+    - name: do something with ufw
+      ufw: logging=off
+      tags: ['domjudge-judgehost', 'ufw']
+
+  handlers:
+    - name: update grub
+      command: /usr/sbin/update-grub

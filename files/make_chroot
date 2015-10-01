@@ -1,0 +1,242 @@
+#!/bin/sh
+#
+# Script to generate a minimal chroot environment with Oracle (Sun) Java
+# support to allow for Java programs to run in a chroot.
+#
+# This script downloads and installs an Ubuntu base system.
+# Minimum requirements: a Linux system with glibc >= 2.3, wget, ar and
+# a POSIX shell in /bin/sh. About 610 MB disk space is needed. It must
+# be run as root and will install the debootstrap package.
+#
+# Part of the DOMjudge Programming Contest Jury System and licenced
+# under the GNU GPL. See README and COPYING for details.
+
+# Abort when a single command fails:
+set -e
+
+cleanup() {
+    # Unmount things on cleanup
+    umount -f "$CHROOTDIR/proc" >/dev/null 2>&1  || /bin/true
+    umount -f "$CHROOTDIR/sys" >/dev/null 2>&1  || /bin/true
+    umount -f "$CHROOTDIR/dev/pts" >/dev/null 2>&1  || /bin/true
+}
+trap cleanup EXIT
+
+chrootcmd() {
+  chroot "$CHROOTDIR" /bin/sh -c "$@"
+}
+
+CHROOTDIR=$1
+
+# Ubuntu release (codename) to bootstrap (note: overriden right below):
+RELEASE="$(lsb_release -c -s)"
+ARCH="$(dpkg --print-architecture)"
+
+# Packages to install after upgrade (space separated):
+INSTALLDEBS="locales"
+# For C# support add: mono-mcs mono-devel
+# However running mono within chroot still gives errors...
+
+# Packages to remove after upgrade (space separated):
+REMOVEDEBS=""
+
+# The Debian mirror/proxy below can be passed as environment
+# variables; if none are given the following defaults are used.
+
+# Ubuntu mirror, modify to match closest mirror
+[ -z "$DEBMIRROR" ] && DEBMIRROR="http://us.archive.ubuntu.com./ubuntu/"
+
+# A local caching proxy to use for debian packages
+# (typically an install of aptcacher-ng), for example:
+#DEBPROXY="http://aptcacher-ng.example.com:3142/"
+[ -z "$DEBPROXY" ] && DEBPROXY=""
+
+# To prevent (libc6) upgrade questions:
+export DEBIAN_FRONTEND=noninteractive
+
+usage()
+{
+    echo "Usage: $0 <chrootdir> [<architecture>]"
+    echo "Creates a chroot environment with Oracle (Sun) Java support using the"
+    echo "Ubuntu GNU/Linux distribution."
+    echo
+    echo "This script must be run as root, <chrootdir> the non-existing target"
+    echo "location of the chroot and <architecture> one of the following:"
+    echo "$ARCHLIST"
+    echo
+    echo "If the host runs Ubuntu, no architecture needs to be specified and"
+    echo "the host architecture and release are used."
+}
+
+error()
+{
+    echo "Error: $*"
+    echo
+    usage
+    exit 1
+}
+
+if [ "`id -u`" != 0 ]; then
+    echo "Warning: you probably need to run this program as root."
+fi
+
+[ -z "$CHROOTDIR" ] && error "No installation directory given."
+
+if [ -e "$CHROOTDIR" ]; then
+	printf "'$CHROOTDIR' already exists. Remove? (y/N) "
+	read yn
+	if [ "$yn" != "y" -a "$yn" != "Y" ]; then
+		error "Chrootdir already exists, exiting."
+	fi
+	rm -rf "$CHROOTDIR"
+fi
+
+mkdir -p "$CHROOTDIR"
+cd "$CHROOTDIR"
+CHROOTDIR="$PWD"
+
+if [ ! -x /usr/sbin/debootstrap ]; then
+	echo "This script requires debootstrap. Please install it then run this command again"
+  exit 1
+fi
+
+INCLUDEOPT=""
+INCLUDEOPT="--include=\"software-properties-common apt-transport-https\""
+EXCLUDEOPT=""
+#EXCLUDEOPT="--exclude=$EXCLUDEDEBS"
+
+BOOTSTRAP_COMMAND="/usr/sbin/debootstrap"
+if [ -n "$DEBPROXY" ]; then
+    BOOTSTRAP_COMMAND="http_proxy=\"$DEBPROXY\" $BOOTSTRAP_COMMAND"
+fi
+
+echo "Running debootstrap to install base system, this may take a while..."
+
+eval $BOOTSTRAP_COMMAND $INCLUDEOPT $EXCLUDEOPT \
+	--variant=minbase --arch "$ARCH" "$RELEASE" "$CHROOTDIR" "$DEBMIRROR"
+
+rm -f "$CHROOTDIR/etc/resolv.conf"
+cp /etc/resolv.conf /etc/hosts /etc/hostname "$CHROOTDIR/etc" || true
+cp /etc/ssl/certs/ca-certificates.crt "$CHROOTDIR/etc/ssl/certs/" || true
+
+cat > "$CHROOTDIR/etc/apt/sources.list" <<EOF
+deb $DEBMIRROR $RELEASE main
+deb $DEBMIRROR $RELEASE universe
+deb $DEBMIRROR $RELEASE-updates main
+deb $DEBMIRROR $RELEASE-updates universe
+deb $DEBMIRROR $RELEASE-security main
+deb $DEBMIRROR $RELEASE-security universe
+EOF
+
+cat > "$CHROOTDIR/etc/apt/apt.conf" <<EOF
+APT::Get::Assume-Yes "true";
+APT::Get::Force-Yes "false";
+APT::Get::Purge "true";
+APT::Install-Recommends "false";
+Acquire::Retries "3";
+Acquire::PDiffs "false";
+EOF
+
+# Add apt proxy settings if desired
+if [ -n "$DEBPROXY" ]; then
+    echo "Acquire::http::Proxy \"$DEBPROXY\";" >> "$CHROOTDIR/etc/apt/apt.conf"
+fi
+
+mount -t proc proc "$CHROOTDIR/proc"
+mount -t sysfs sysfs "$CHROOTDIR/sys"
+
+# Required for some warning messages about writing to log files
+mount --bind /dev/pts "$CHROOTDIR/dev/pts"
+
+# Prevent perl locale warnings in the chroot:
+export LC_ALL=C
+
+# Preseed debconf
+chrootcmd debconf-set-selections <<EOF
+passwd	passwd/root-password-crypted	password
+passwd	passwd/user-password-crypted	password
+passwd	passwd/root-password		password
+passwd	passwd/root-password-again	password
+passwd	passwd/user-password-again	password
+passwd	passwd/user-password		password
+passwd	passwd/shadow			boolean	true
+passwd	passwd/username-bad		note
+passwd	passwd/password-mismatch	note
+passwd	passwd/username			string
+passwd	passwd/make-user		boolean	true
+passwd	passwd/md5			boolean	false
+passwd	passwd/user-fullname		string
+passwd	passwd/user-uid			string
+passwd	passwd/password-empty		note
+debconf	debconf/priority	select	high
+debconf	debconf/frontend	select	Noninteractive
+locales	locales/locales_to_be_generated	multiselect
+locales	locales/default_environment_locale	select	None
+EOF
+
+# Disable upstart init scripts(so upgrades work), we don't need to actually run
+# any services in the chroot, so this is fine.
+# Refer to: http://ubuntuforums.org/showthread.php?t=1326721
+chrootcmd "dpkg-divert --local --rename --add /sbin/initctl"
+chrootcmd "ln -s /bin/true /sbin/initctl"
+
+
+# add oracle java ppa
+chrootcmd debconf-set-selections <<EOF
+debconf shared/accepted-oracle-license-v1-1 select true
+debconf shared/accepted-oracle-license-v1-1 seen true
+EOF
+chrootcmd "apt-add-repository -y ppa:webupd8team/java"
+
+# nodejs repository
+wget -q https://deb.nodesource.com/gpgkey/nodesource.gpg.key -O $CHROOTDIR/tmp/nodesource.gpg.key
+chrootcmd "apt-key add /tmp/nodesource.gpg.key"
+cat > "$CHROOTDIR/etc/apt/sources.list.d/nodesource.list" <<EOF
+deb https://deb.nodesource.com/node_0.12 trusty main
+deb-src https://deb.nodesource.com/node_0.12 trusty main
+EOF
+
+# Upgrade the system, and install/remove packages as desired
+chrootcmd "apt-get update && apt-get dist-upgrade"
+chrootcmd "apt-get clean"
+chrootcmd "apt-get install $INSTALLDEBS"
+
+#chrootcmd "apt-get install build-essential"
+#chrootcmd "apt-get install fpc"
+#chrootcmd "apt-get install ghc"
+#chrootcmd "apt-get install gfortran"
+#chrootcmd "apt-get install gnat"
+chrootcmd "apt-get install python"
+chrootcmd "apt-get install python3"
+chrootcmd "apt-get install mono-mcs"
+chrootcmd "apt-get install lua5.2"
+chrootcmd "apt-get install oracle-java8-installer"
+chrootcmd "apt-get install golang"
+chrootcmd "apt-get install ruby"
+chrootcmd "apt-get install nodejs"
+
+# scala
+wget http://downloads.typesafe.com/scala/2.11.7/scala-2.11.7.deb -O "$CHROOTDIR/tmp/scala.deb"
+chrootcmd "dpkg -i /tmp/scala.deb"
+
+
+
+# Do some cleanup of the chroot
+chrootcmd "apt-get remove --purge $REMOVEDEBS"
+chrootcmd "apt-get autoremove --purge"
+chrootcmd "apt-get clean"
+
+# Remove unnecessary setuid bits
+chrootcmd "chmod a-s /usr/bin/wall /usr/bin/newgrp \
+	/usr/bin/chage /usr/bin/chfn /usr/bin/chsh /usr/bin/expiry \
+	/usr/bin/gpasswd /usr/bin/passwd /usr/lib/pt_chown \
+	/bin/su /bin/mount /bin/umount /sbin/unix_chkpwd"
+
+# Disable root account
+sed -i "s/^root::/root:*:/" "$CHROOTDIR/etc/shadow"
+
+umount "$CHROOTDIR/dev/pts"
+umount "$CHROOTDIR/sys"
+umount "$CHROOTDIR/proc"
+
+exit 0
