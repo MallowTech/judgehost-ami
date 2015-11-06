@@ -2,10 +2,6 @@
 - hosts: localhost
   user: root
   pre_tasks:
-    - name: disable fsync for dpkg
-      copy: src=files/02-dpkg-no-sync dest=/etc/dpkg/dpkg.cfg.d/02-dpkg-no-sync
-    - name: disable apt cache
-      copy: src=files/02-fast-apt dest=/etc/apt/apt.conf.d/02-fast-apt
     - name: be sure apt cache is updated
       apt: update_cache=yes
 
