@@ -49,6 +49,20 @@
       apt: pkg=domjudge-judgehost state=latest install_recommends=no
       tags: domjudge-judgehost
 
+    - name: Make sure domjudge isn't running
+      service: name=domjudge-judgehost state=stopped
+
+    - name: delete existing judgehost init scripts
+      command: /usr/sbin/update-rc.d -f domjudge-judgehost remove removes=/etc/rc0.d/K20domjudge-judgehost
+    - name: delete old init script
+      file: path=/etc/init.d/domjudge-judgehost state=absent
+
+    - name: install our own init scripts
+      copy: src=files/{{item}} dest=/etc/init/{{item}}
+      with_items:
+        - judgedaemon-instance.conf
+        - judgedaemons.conf
+
     - name: enable swap accounting(for cgroups)
       lineinfile: dest=/etc/default/grub.d/50-cloudimg-settings.cfg regexp="^GRUB_CMDLINE_LINUX_DEFAULT=" line='GRUB_CMDLINE_LINUX_DEFAULT="console=tty1 console=ttyS0 swapaccount=1"' state=present
       notify: update grub
