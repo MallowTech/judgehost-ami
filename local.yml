@@ -48,9 +48,11 @@
     - name: install the domjudge judgehost
       apt: pkg=domjudge-judgehost state=latest install_recommends=no
       tags: domjudge-judgehost
+      register: installdj
 
     - name: Make sure domjudge isn't running
       service: name=domjudge-judgehost state=stopped
+      when: installdj.changed
 
     - name: delete existing judgehost init scripts
       command: /usr/sbin/update-rc.d -f domjudge-judgehost remove removes=/etc/rc0.d/K20domjudge-judgehost
