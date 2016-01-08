@@ -4,7 +4,7 @@ DOMjudge JudgeHost(the sandbox evaluation portion). It basically installs
 the Judgehost and its dependencies into an Ubuntu 14.04 image and makes the
 judgedaemons configurable in a way we expect.
 
-TODO: Link to the parent repository that uses this AMI(Currently unpublished)
+Please refer to the parent project for more details: https://github.com/ubergeek42/domjudge-aws
 
 ## Dependencies
 This script depends on boto3 to be present on your workstation.
