@@ -43,7 +43,7 @@ sub_message = MIMEText(udscript, "x-shellscript", sys.getdefaultencoding())
 sub_message.add_header('Content-Disposition', 'attachment; filename="01bootstrap.txt"')
 combined_message.attach(sub_message)
 
-conn = boto.ec2.connect_to_region("us-east-1")
+conn = boto.ec2.connect_to_region(region)
 reservation = conn.run_instances(
     baseami,
     #key_name=ssh_keypair,
