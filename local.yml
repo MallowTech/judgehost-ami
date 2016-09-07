@@ -124,7 +124,7 @@
         - git           # git
         - cmake
         - ninja-build
-        - clang
+        - clang-3.4
         - python
         - uuid-dev
         - libicu-dev
@@ -150,13 +150,13 @@
       command: 'update-alternatives --install /usr/bin/clang++ clang++ /usr/bin/clang++-3.6 100'
         
     - name: Download swift
-      get_url: url:https://swift.org/builds/swift-2.2.1-release/ubuntu1404/swift-2.2.1-RELEASE/swift-2.2.1-RELEASE-ubuntu14.04.tar.gz -O "$CHROOTDIR/tmp/swift-2.2.1-RELEASE-ubuntu14.04.tar.gz dest=/tmp/swift-2.2.1-RELEASE-ubuntu14.04.tar.gz
+      get_url: url=https://swift.org/builds/swift-2.2.1-release/ubuntu1404/swift-2.2.1-RELEASE/swift-2.2.1-RELEASE-ubuntu14.04.tar.gz dest=/usr/lib/swift-2.2.1-RELEASE-ubuntu14.04.tar.gz
       
     - name: install swift
-      unarchive: src=/tmp/swift-2.2.1-RELEASE-ubuntu14.04.tar.gz dest=/var/lib/domjudge/javachroot/usr/lib/swift  
-      
-    - name: set path
-      command: 'export PATH=/var/lib/domjudge/javachroot/usr/lib/swift:"${PATH}"'
+      command: 'tar xzf /usr/lib/swift-2.2.1-RELEASE-ubuntu14.04.tar.gz'
+     
+    - name: move swift
+      command: 'mv /mnt/playbooks/swift-2.2.1-RELEASE-ubuntu14.04 /var/lib/domjudge/javachroot/usr/lib/swift'
       
     - name: do something with ufw
       ufw: logging=off

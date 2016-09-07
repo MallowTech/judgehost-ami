@@ -32,7 +32,7 @@ apt-add-repository -y ppa:ansible/ansible
 apt-get update
 apt-get install -y -q ansible
 
-ansible-pull -U http://github.com/ubergeek42/judgehost-ami.git -d /mnt/playbooks -i "localhost,"
+ansible-pull -U https://github.com/MallowTech/judgehost-ami.git -d /mnt/playbooks -i "localhost,"
 
 exit 0
 """
