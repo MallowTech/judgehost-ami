@@ -219,7 +219,17 @@ chrootcmd "apt-get install nodejs"
 wget http://downloads.typesafe.com/scala/2.11.7/scala-2.11.7.deb -O "$CHROOTDIR/tmp/scala.deb"
 chrootcmd "dpkg -i /tmp/scala.deb"
 
+# Swift
+chrootcmd "apt-get install git cmake ninja-build clang python uuid-dev libicu-dev icu-devtools libbsd-dev libedit-dev libxml2-dev libsqlite3-dev swig libpython-dev libncurses5-dev pkg-config libblocksruntime-dev libcurl4-openssl-dev
+"
+chrootcmd "apt-get install clang-3.6"
+chrootcmd "update-alternatives --install /usr/bin/clang clang /usr/bin/clang-3.6 100"
+chrootcmd "update-alternatives --install /usr/bin/clang++ clang++ /usr/bin/clang++-3.6 100"
 
+wget https://swift.org/builds/swift-2.2.1-release/ubuntu1404/swift-2.2.1-RELEASE/swift-2.2.1-RELEASE-ubuntu14.04.tar.gz -O "$CHROOTDIR/tmp/swift-2.2.1-RELEASE-ubuntu14.04.tar.gz"
+tar xzf swift-2.2.1-RELEASE-ubuntu14.04.tar.gz -C "$CHROOTDIR/usr/lib/"
+
+export PATH=$CHROOTDIR/usr/lib/swift-2.2.1-RELEASE-ubuntu14.04/usr/bin:"${PATH}"
 
 # Do some cleanup of the chroot
 chrootcmd "apt-get remove --purge $REMOVEDEBS"

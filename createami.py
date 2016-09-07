@@ -10,7 +10,9 @@ from email.mime.text import MIMEText
 # From http://cloud-images.ubuntu.com/locator/ec2/
 # Choose the hvm:ebs-ssd "Instance Type" for say trusty us-east
 #baseami = 'ami-fdb9fc98'  # Trusty 14.04 amd64 hvm:ebs-ssd 2015-09-28
-baseami = 'ami-5c207736'  # Trusty 14.04 amd64 hvm:ebs-ssd 2015-12-18
+# baseami = 'ami-5c207736'  # Trusty 14.04 amd64 hvm:ebs-ssd 2015-12-18
+baseami = 'ami-2b594f41'
+
 region = 'us-east-1'
 #ssh_keypair = 'domjudge-aws'
 #ssh_securitygroup = 'open-ssh'

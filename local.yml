@@ -118,6 +118,46 @@
       apt: deb=/tmp/scala.deb
       when: not has_scala.stat.exists
 
+    - name: install swift dependencies
+      apt: pkg={{ item }} state=present
+      with_items:
+        - git           # git
+        - cmake
+        - ninja-build
+        - clang
+        - python
+        - uuid-dev
+        - libicu-dev
+        - icu-devtools
+        - libbsd-dev
+        - libedit-dev
+        - libxml2-dev
+        - libsqlite3-dev
+        - swig
+        - libpython-dev
+        - libncurses5-dev
+        - pkg-config
+        - libblocksruntime-dev
+        - libcurl4-openssl-dev
+        
+    - name: Update clang to support swift for Ubuntu 14.04 LTS
+      apt: pkg=clang-3.6 state=present
+      
+    - name: Update alternatives for swift
+      command: 'update-alternatives --install /usr/bin/clang clang /usr/bin/clang-3.6 100'
+      
+    - name: Update re alternatives for swift 
+      command: 'update-alternatives --install /usr/bin/clang++ clang++ /usr/bin/clang++-3.6 100'
+        
+    - name: Download swift
+      get_url: url:https://swift.org/builds/swift-2.2.1-release/ubuntu1404/swift-2.2.1-RELEASE/swift-2.2.1-RELEASE-ubuntu14.04.tar.gz -O "$CHROOTDIR/tmp/swift-2.2.1-RELEASE-ubuntu14.04.tar.gz dest=/tmp/swift-2.2.1-RELEASE-ubuntu14.04.tar.gz
+      
+    - name: install swift
+      unarchive: src=/tmp/swift-2.2.1-RELEASE-ubuntu14.04.tar.gz dest=/var/lib/domjudge/javachroot/usr/lib/swift  
+      
+    - name: set path
+      command: 'export PATH=/var/lib/domjudge/javachroot/usr/lib/swift:"${PATH}"'
+      
     - name: do something with ufw
       ufw: logging=off
       tags: ['domjudge-judgehost', 'ufw']
